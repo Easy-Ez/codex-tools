@@ -20,10 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: "macos-13"
-            args: "--target x86_64-apple-darwin"
           - runner: "macos-latest"
-            args: "--target aarch64-apple-darwin"
+            args: ""
           - runner: "windows-latest"
             args: ""
     runs-on: ${{ matrix.runner }}
