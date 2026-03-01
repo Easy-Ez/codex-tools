@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
@@ -15,10 +15,12 @@ import type {
 const REFRESH_MS = 30_000;
 const ADD_FLOW_TIMEOUT_MS = 10 * 60_000;
 const ADD_FLOW_POLL_MS = 2_500;
+const MANUAL_DOWNLOAD_URL = "https://github.com/170-carry/codex-tools/releases/latest";
 const DEFAULT_SETTINGS: AppSettings = {
   launchAtStartup: false,
   trayUsageDisplayMode: "remaining",
   launchCodexAfterSwitch: true,
+  syncOpencodeOpenaiAuth: false,
 };
 
 export function useCodexController() {
@@ -32,9 +34,11 @@ export function useCodexController() {
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<string | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<PendingUpdateInfo | null>(null);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
+  const installingUpdateRef = useRef(false);
 
   const currentCount = useMemo(
     () => accounts.filter((account) => account.isCurrent).length,
@@ -93,84 +97,114 @@ export function useCodexController() {
     }
   }, []);
 
-  const checkForAppUpdate = useCallback(async (quiet = false) => {
-    if (!quiet) {
-      setCheckingUpdate(true);
-    }
-    try {
-      const update = await check();
-      if (update) {
-        setPendingUpdate({
-          currentVersion: update.currentVersion,
-          version: update.version,
-          body: update.body,
-          date: update.date,
-        });
-        if (!quiet) {
-          setNotice({
-            type: "info",
-            message: `发现新版本 ${update.version}（当前 ${update.currentVersion}）`,
-          });
-        }
-      } else {
-        setPendingUpdate(null);
-        if (!quiet) {
-          setNotice({ type: "ok", message: "当前已是最新版本" });
-        }
-      }
-    } catch (error) {
-      if (!quiet) {
-        setNotice({ type: "error", message: `检查更新失败：${String(error)}` });
-      }
-    } finally {
-      if (!quiet) {
-        setCheckingUpdate(false);
-      }
-    }
-  }, []);
+  useEffect(() => {
+    installingUpdateRef.current = installingUpdate;
+  }, [installingUpdate]);
 
-  const installPendingUpdate = useCallback(async () => {
-    setInstallingUpdate(true);
-    setUpdateProgress("准备下载更新...");
-    try {
-      const update = await check();
-      if (!update) {
-        setPendingUpdate(null);
-        setNotice({ type: "ok", message: "当前已是最新版本" });
+  const installPendingUpdate = useCallback(
+    async (knownUpdate?: NonNullable<Awaited<ReturnType<typeof check>>>) => {
+      if (installingUpdateRef.current) {
         return;
       }
 
-      let totalBytes = 0;
-      let downloadedBytes = 0;
-      await update.downloadAndInstall((event) => {
-        if (event.event === "Started") {
-          totalBytes = event.data.contentLength ?? 0;
-          downloadedBytes = 0;
-          setUpdateProgress("开始下载更新...");
-        } else if (event.event === "Progress") {
-          downloadedBytes += event.data.chunkLength;
-          if (totalBytes > 0) {
-            const percentValue = Math.min(
-              100,
-              Math.round((downloadedBytes / totalBytes) * 100),
-            );
-            setUpdateProgress(`下载中 ${percentValue}%`);
-          } else {
-            setUpdateProgress("下载中...");
-          }
-        } else if (event.event === "Finished") {
-          setUpdateProgress("下载完成，准备安装...");
+      setInstallingUpdate(true);
+      setUpdateProgress("准备下载更新...");
+      try {
+        const update = knownUpdate ?? (await check());
+        if (!update) {
+          setPendingUpdate(null);
+          setUpdateDialogOpen(false);
+          setNotice({ type: "ok", message: "当前已是最新版本" });
+          return;
         }
-      });
 
-      setUpdateProgress("安装完成，正在重启...");
-      await relaunch();
+        let totalBytes = 0;
+        let downloadedBytes = 0;
+        await update.downloadAndInstall((event) => {
+          if (event.event === "Started") {
+            totalBytes = event.data.contentLength ?? 0;
+            downloadedBytes = 0;
+            setUpdateProgress("开始下载更新...");
+          } else if (event.event === "Progress") {
+            downloadedBytes += event.data.chunkLength;
+            if (totalBytes > 0) {
+              const percentValue = Math.min(
+                100,
+                Math.round((downloadedBytes / totalBytes) * 100),
+              );
+              setUpdateProgress(`下载中 ${percentValue}%`);
+            } else {
+              setUpdateProgress("下载中...");
+            }
+          } else if (event.event === "Finished") {
+            setUpdateProgress("下载完成，准备安装...");
+          }
+        });
+
+        setUpdateProgress("安装完成，正在重启...");
+        await relaunch();
+      } catch (error) {
+        setNotice({ type: "error", message: `安装更新失败：${String(error)}` });
+        setUpdateProgress(null);
+      } finally {
+        setInstallingUpdate(false);
+      }
+    },
+    [],
+  );
+
+  const checkForAppUpdate = useCallback(
+    async (quiet = false) => {
+      if (!quiet) {
+        setCheckingUpdate(true);
+      }
+      try {
+        const update = await check();
+        if (update) {
+          setPendingUpdate({
+            currentVersion: update.currentVersion,
+            version: update.version,
+            body: update.body,
+            date: update.date,
+          });
+          setUpdateDialogOpen(true);
+          if (!quiet) {
+            setNotice({
+              type: "info",
+              message: `发现新版本 ${update.version}（当前 ${update.currentVersion}），已开始自动下载。`,
+            });
+          }
+          void installPendingUpdate(update);
+        } else {
+          setPendingUpdate(null);
+          setUpdateDialogOpen(false);
+          if (!quiet) {
+            setNotice({ type: "ok", message: "当前已是最新版本" });
+          }
+        }
+      } catch (error) {
+        if (!quiet) {
+          setNotice({ type: "error", message: `检查更新失败：${String(error)}` });
+        }
+      } finally {
+        if (!quiet) {
+          setCheckingUpdate(false);
+        }
+      }
+    },
+    [installPendingUpdate],
+  );
+
+  const openManualDownloadPage = useCallback(async () => {
+    try {
+      await invoke("open_external_url", { url: MANUAL_DOWNLOAD_URL });
     } catch (error) {
-      setNotice({ type: "error", message: `安装更新失败：${String(error)}` });
-      setUpdateProgress(null);
-    } finally {
-      setInstallingUpdate(false);
+      setNotice({ type: "error", message: `打开下载页面失败：${String(error)}` });
     }
+  }, []);
+
+  const closeUpdateDialog = useCallback(() => {
+    setUpdateDialogOpen(false);
   }, []);
 
   useEffect(() => {
@@ -320,23 +354,40 @@ export function useCodexController() {
         });
         await loadAccounts();
 
+        let baseNotice: Notice;
         if (!settings.launchCodexAfterSwitch) {
-          setNotice({ type: "ok", message: "账号已切换（未自动启动 Codex）。" });
+          baseNotice = { type: "ok", message: "账号已切换（未自动启动 Codex）。" };
         } else if (result.usedFallbackCli) {
-          setNotice({
+          baseNotice = {
             type: "info",
             message: "账号已切换。未找到本地 Codex.app，已尝试通过 codex app 启动。",
-          });
+          };
         } else {
-          setNotice({ type: "ok", message: "账号已切换，正在启动 Codex。" });
+          baseNotice = { type: "ok", message: "账号已切换，正在启动 Codex。" };
         }
+
+        if (settings.syncOpencodeOpenaiAuth) {
+          if (result.opencodeSyncError) {
+            baseNotice = {
+              type: "error",
+              message: `${baseNotice.message} Opencode 同步失败：${result.opencodeSyncError}`,
+            };
+          } else if (result.opencodeSynced) {
+            baseNotice = {
+              ...baseNotice,
+              message: `${baseNotice.message} 已同步 Opencode OpenAI 认证。`,
+            };
+          }
+        }
+
+        setNotice(baseNotice);
       } catch (error) {
         setNotice({ type: "error", message: `切换失败：${String(error)}` });
       } finally {
         setSwitchingId(null);
       }
     },
-    [loadAccounts, settings.launchCodexAfterSwitch],
+    [loadAccounts, settings.launchCodexAfterSwitch, settings.syncOpencodeOpenaiAuth],
   );
 
   return {
@@ -350,6 +401,7 @@ export function useCodexController() {
     installingUpdate,
     updateProgress,
     pendingUpdate,
+    updateDialogOpen,
     notice,
     settings,
     savingSettings,
@@ -357,6 +409,8 @@ export function useCodexController() {
     refreshUsage,
     checkForAppUpdate,
     installPendingUpdate,
+    openManualDownloadPage,
+    closeUpdateDialog,
     updateSettings,
     onStartAddAccount,
     onCancelAddFlow,

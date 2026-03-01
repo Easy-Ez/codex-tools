@@ -40,6 +40,9 @@ pub(crate) async fn update_app_settings_internal(
         if let Some(value) = patch.launch_codex_after_switch {
             store.settings.launch_codex_after_switch = value;
         }
+        if let Some(value) = patch.sync_opencode_openai_auth {
+            store.settings.sync_opencode_openai_auth = value;
+        }
 
         let settings = store.settings.clone();
         save_store(app, &store)?;

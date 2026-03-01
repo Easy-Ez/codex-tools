@@ -88,6 +88,8 @@ pub(crate) struct SwitchAccountResult {
     pub(crate) account_id: String,
     pub(crate) launched_app_path: Option<String>,
     pub(crate) used_fallback_cli: bool,
+    pub(crate) opencode_synced: bool,
+    pub(crate) opencode_sync_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -125,6 +127,7 @@ pub(crate) struct AppSettings {
     pub(crate) launch_at_startup: bool,
     pub(crate) tray_usage_display_mode: TrayUsageDisplayMode,
     pub(crate) launch_codex_after_switch: bool,
+    pub(crate) sync_opencode_openai_auth: bool,
 }
 
 impl Default for AppSettings {
@@ -133,6 +136,7 @@ impl Default for AppSettings {
             launch_at_startup: false,
             tray_usage_display_mode: TrayUsageDisplayMode::Remaining,
             launch_codex_after_switch: true,
+            sync_opencode_openai_auth: false,
         }
     }
 }
@@ -143,6 +147,7 @@ pub(crate) struct AppSettingsPatch {
     pub(crate) launch_at_startup: Option<bool>,
     pub(crate) tray_usage_display_mode: Option<TrayUsageDisplayMode>,
     pub(crate) launch_codex_after_switch: Option<bool>,
+    pub(crate) sync_opencode_openai_auth: Option<bool>,
 }
 
 impl StoredAccount {

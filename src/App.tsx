@@ -6,6 +6,7 @@ import { AppTopBar } from "./components/AppTopBar";
 import { MetaStrip } from "./components/MetaStrip";
 import { NoticeBanner } from "./components/NoticeBanner";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { useCodexController } from "./hooks/useCodexController";
 import { useThemeMode } from "./hooks/useThemeMode";
 
@@ -21,12 +22,18 @@ function App() {
     switchingId,
     checkingUpdate,
     installingUpdate,
+    updateProgress,
+    pendingUpdate,
+    updateDialogOpen,
     notice,
     settings,
     savingSettings,
     currentCount,
     refreshUsage,
     checkForAppUpdate,
+    installPendingUpdate,
+    openManualDownloadPage,
+    closeUpdateDialog,
     updateSettings,
     onStartAddAccount,
     onCancelAddFlow,
@@ -68,6 +75,15 @@ function App() {
         />
 
         <NoticeBanner notice={notice} />
+        <UpdateBanner
+          open={updateDialogOpen}
+          pendingUpdate={pendingUpdate}
+          updateProgress={updateProgress}
+          installingUpdate={installingUpdate}
+          onClose={closeUpdateDialog}
+          onManualDownload={() => void openManualDownloadPage()}
+          onRetryAutoDownload={() => void installPendingUpdate()}
+        />
 
         <AccountsGrid
           accounts={accounts}

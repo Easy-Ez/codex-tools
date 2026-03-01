@@ -84,6 +84,16 @@ export function SettingsPanel({
           disabled={savingSettings}
         />
 
+        <SwitchField
+          checked={settings.syncOpencodeOpenaiAuth}
+          onChange={(checked) => onUpdateSettings({ syncOpencodeOpenaiAuth: checked })}
+          label="同步 Opencode OpenAI"
+          description="切换账号时自动探测 opencode 认证文件，并同步 refresh/access。"
+          checkedText="同步"
+          uncheckedText="不同步"
+          disabled={savingSettings}
+        />
+
         <div className="settingRow">
           <div className="settingMeta">
             <strong>状态栏展示</strong>

@@ -10,6 +10,13 @@ use crate::models::CurrentAuthStatus;
 use crate::models::ExtractedAuth;
 use crate::utils::set_private_permissions;
 
+pub(crate) struct CodexOAuthTokens {
+    pub(crate) access_token: String,
+    pub(crate) refresh_token: String,
+    pub(crate) account_id: Option<String>,
+    pub(crate) expires_at_ms: Option<i64>,
+}
+
 pub(crate) fn read_current_codex_auth() -> Result<Value, String> {
     let path = codex_auth_path()?;
     let raw = fs::read_to_string(&path)
@@ -195,6 +202,43 @@ pub(crate) fn current_auth_account_id() -> Option<String> {
             .and_then(|value| value.get("account_id"))
             .and_then(Value::as_str)
             .map(ToString::to_string)
+    })
+}
+
+/// 为第三方客户端同步登录态时，提取可复用的 OpenAI OAuth token。
+pub(crate) fn extract_codex_oauth_tokens(auth_json: &Value) -> Result<CodexOAuthTokens, String> {
+    let tokens = auth_json
+        .get("tokens")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "auth.json 缺少 tokens".to_string())?;
+
+    let access_token = tokens
+        .get("access_token")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "auth.json 缺少 access_token".to_string())?
+        .to_string();
+    let refresh_token = tokens
+        .get("refresh_token")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "auth.json 缺少 refresh_token".to_string())?
+        .to_string();
+    let account_id = tokens
+        .get("account_id")
+        .and_then(Value::as_str)
+        .map(ToString::to_string);
+
+    let expires_at_ms = tokens
+        .get("id_token")
+        .and_then(Value::as_str)
+        .and_then(|id_token| decode_jwt_payload(id_token).ok())
+        .and_then(|payload| payload.get("exp").and_then(Value::as_i64))
+        .map(|value| value * 1000);
+
+    Ok(CodexOAuthTokens {
+        access_token,
+        refresh_token,
+        account_id,
+        expires_at_ms,
     })
 }
 

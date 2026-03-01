@@ -2,6 +2,7 @@ mod account_service;
 mod auth;
 mod cli;
 mod models;
+mod opencode;
 mod settings_service;
 mod state;
 mod store;
@@ -95,6 +96,37 @@ fn detect_codex_app() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("仅允许打开 http/https 链接".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut command = Command::new("open");
+        command.arg(&url);
+        command
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "", &url]);
+        command
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = {
+        let mut command = Command::new("xdg-open");
+        command.arg(&url);
+        command
+    };
+
+    cmd.spawn().map_err(|e| format!("打开外部链接失败: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
 fn get_current_auth_status() -> Result<CurrentAuthStatus, String> {
     auth::read_current_auth_status()
 }
@@ -163,8 +195,23 @@ async fn switch_account_and_launch(
         .cloned()
         .ok_or_else(|| "找不到要切换的账号".to_string())?;
 
+    let should_sync_opencode = store.settings.sync_opencode_openai_auth;
     auth::write_active_codex_auth(&account.auth_json)?;
     let _ = tray::refresh_macos_tray_snapshot(&app);
+
+    let mut opencode_synced = false;
+    let mut opencode_sync_error = None;
+    if should_sync_opencode {
+        match opencode::sync_openai_auth_from_codex_auth(&account.auth_json) {
+            Ok(()) => {
+                opencode_synced = true;
+            }
+            Err(err) => {
+                log::warn!("同步 opencode OpenAI 认证失败: {err}");
+                opencode_sync_error = Some(err);
+            }
+        }
+    }
 
     // 向后兼容：旧前端未传参数时仍按“切换并启动”处理。
     let should_launch_codex = launch_codex.unwrap_or(true);
@@ -173,6 +220,8 @@ async fn switch_account_and_launch(
             account_id: account.account_id,
             launched_app_path: None,
             used_fallback_cli: false,
+            opencode_synced,
+            opencode_sync_error,
         });
     }
 
@@ -196,6 +245,8 @@ async fn switch_account_and_launch(
             account_id: account.account_id,
             launched_app_path: Some(path.to_string_lossy().to_string()),
             used_fallback_cli: false,
+            opencode_synced,
+            opencode_sync_error,
         });
     }
 
@@ -211,6 +262,8 @@ async fn switch_account_and_launch(
         account_id: account.account_id,
         launched_app_path: None,
         used_fallback_cli: true,
+        opencode_synced,
+        opencode_sync_error,
     })
 }
 
@@ -277,6 +330,7 @@ pub fn run() {
             get_app_settings,
             update_app_settings,
             detect_codex_app,
+            open_external_url,
             get_current_auth_status,
             launch_codex_login,
             restore_auth_after_add_flow,

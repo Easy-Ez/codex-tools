@@ -35,6 +35,8 @@ export type SwitchAccountResult = {
   accountId: string;
   launchedAppPath: string | null;
   usedFallbackCli: boolean;
+  opencodeSynced: boolean;
+  opencodeSyncError: string | null;
 };
 
 export type CurrentAuthStatus = {
@@ -72,4 +74,5 @@ export type AppSettings = {
   launchAtStartup: boolean;
   trayUsageDisplayMode: TrayUsageDisplayMode;
   launchCodexAfterSwitch: boolean;
+  syncOpencodeOpenaiAuth: boolean;
 };

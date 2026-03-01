@@ -255,6 +255,31 @@
   animation: riseIn 220ms ease both;
 }
 
+.updateOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 16, 31, 0.44);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 140ms ease both;
+}
+
+.updateDialog {
+  width: min(700px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--update-border);
+  border-radius: 16px;
+  background: var(--update-bg);
+  padding: 14px;
+  box-shadow: var(--panel-shadow);
+  animation: riseIn 220ms ease both;
+}
+
 .settingsHeader {
   display: flex;
   align-items: flex-start;
@@ -512,6 +537,7 @@ button.danger {
 }
 
 .updateText {
+  margin-top: 8px;
   display: flex;
   gap: 12px;
   align-items: baseline;
@@ -531,6 +557,13 @@ button.danger {
 
 .updateActions {
   margin-top: 10px;
+}
+
+.updateDialogActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .updateBody {
@@ -840,6 +873,16 @@ button.danger {
     max-height: calc(100vh - 24px);
     border-radius: 14px;
     padding: 14px;
+  }
+
+  .updateOverlay {
+    padding: 12px;
+  }
+
+  .updateDialog {
+    max-height: calc(100vh - 24px);
+    border-radius: 14px;
+    padding: 12px;
   }
 
   .metaStrip {
