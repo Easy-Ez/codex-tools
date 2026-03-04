@@ -5,9 +5,12 @@
 - 快速切换账号
 - 自动拉起 Codex
 
-仓库地址：<https://github.com/170-carry/codex-tools>
+仓库地址：<https://github.com/Easy-Ez/codex-tools>
 
 ## 更新日志
+- v0.3.3
+  1. 切换账号或恢复账号时，除更新 `~/.codex/auth.json` 外，也会同步更新最新 WebStorm 版本的授权文件（`~/Library/Caches/JetBrains/WebStorm*/aia/codex/auth.json`）。
+  2. 删除本地活跃授权时，同步删除最新 WebStorm 版本的授权文件，保持两端一致。
 - v0.3.2
   1. 增加用量排序
 - v0.3.1
@@ -87,6 +90,7 @@ npm run tauri dev
 - 点「切换并启动」即可切到目标账号
 - 后台静默探测 Codex App 并启动
 - 找不到 App 时自动回退到 `codex app`
+- 切换后会同步写入最新 WebStorm 插件授权文件（若检测到）
 
 ### 4. 添加账号不影响当前账号
 
@@ -111,13 +115,13 @@ npm run tauri dev
 触发发布：
 
 ```bash
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.3.3
+git push origin v0.3.3
 ```
 
 查看：
-- 代码仓库: <https://github.com/170-carry/codex-tools>
-- 版本发布: <https://github.com/170-carry/codex-tools/releases>
+- 代码仓库: <https://github.com/Easy-Ez/codex-tools>
+- 版本发布: <https://github.com/Easy-Ez/codex-tools/releases>
 
 ## 目录说明
 

@@ -23,12 +23,6 @@ jobs:
           - runner: "macos-latest"
             args: "--target aarch64-apple-darwin"
             bundle_nickname: "macOS Apple Silicon"
-          - runner: "macos-15-intel"
-            args: "--target x86_64-apple-darwin"
-            bundle_nickname: "macOS Intel"
-          - runner: "windows-latest"
-            args: ""
-            bundle_nickname: "Windows"
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -64,8 +58,6 @@ jobs:
 
             Build matrix includes:
             - macOS Apple Silicon (aarch64)
-            - macOS Intel (x86_64)
-            - Windows
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

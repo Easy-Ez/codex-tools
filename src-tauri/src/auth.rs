@@ -2,7 +2,9 @@ use base64::engine::general_purpose::URL_SAFE;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use serde_json::Value;
+use std::cmp::Ordering;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
@@ -101,27 +103,22 @@ pub(crate) fn read_current_auth_status() -> Result<CurrentAuthStatus, String> {
 }
 
 pub(crate) fn write_active_codex_auth(auth_json: &Value) -> Result<(), String> {
-    let path = codex_auth_path()?;
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("无法解析 auth 目录 {}", path.display()))?;
-    fs::create_dir_all(parent)
-        .map_err(|e| format!("创建 auth 目录失败 {}: {e}", parent.display()))?;
-
     let serialized = serde_json::to_string_pretty(auth_json)
         .map_err(|e| format!("序列化 auth.json 失败: {e}"))?;
-    fs::write(&path, serialized)
-        .map_err(|e| format!("写入 auth.json 失败 {}: {e}", path.display()))?;
-    set_private_permissions(&path);
+
+    let path = codex_auth_path()?;
+    write_auth_json_file(&path, &serialized)?;
+    sync_latest_webstorm_auth_json(&serialized)?;
     Ok(())
 }
 
 pub(crate) fn remove_active_codex_auth() -> Result<(), String> {
     let path = codex_auth_path()?;
-    if !path.exists() {
-        return Ok(());
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| format!("删除 auth.json 失败 {}: {e}", path.display()))?;
     }
-    fs::remove_file(&path).map_err(|e| format!("删除 auth.json 失败 {}: {e}", path.display()))
+    remove_latest_webstorm_auth_json()?;
+    Ok(())
 }
 
 /// 解析当前 auth.json，提取账号标识和用量接口所需 token。
@@ -328,6 +325,119 @@ pub(crate) async fn refresh_chatgpt_auth_tokens(auth_json: &Value) -> Result<Val
 fn codex_auth_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or_else(|| "无法读取 HOME 目录".to_string())?;
     Ok(home.join(".codex").join("auth.json"))
+}
+
+fn write_auth_json_file(path: &Path, serialized: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("无法解析 auth 目录 {}", path.display()))?;
+    fs::create_dir_all(parent)
+        .map_err(|e| format!("创建 auth 目录失败 {}: {e}", parent.display()))?;
+    fs::write(path, serialized).map_err(|e| format!("写入 auth.json 失败 {}: {e}", path.display()))?;
+    set_private_permissions(path);
+    Ok(())
+}
+
+fn sync_latest_webstorm_auth_json(serialized: &str) -> Result<(), String> {
+    let Some(path) = latest_webstorm_auth_json_path() else {
+        return Ok(());
+    };
+    write_auth_json_file(&path, serialized)
+        .map_err(|e| format!("同步 WebStorm auth.json 失败: {e}"))?;
+    Ok(())
+}
+
+fn remove_latest_webstorm_auth_json() -> Result<(), String> {
+    let Some(path) = latest_webstorm_auth_json_path() else {
+        return Ok(());
+    };
+
+    if !path.exists() {
+        return Ok(());
+    }
+
+    fs::remove_file(&path)
+        .map_err(|e| format!("删除 WebStorm auth.json 失败 {}: {e}", path.display()))?;
+    Ok(())
+}
+
+fn latest_webstorm_auth_json_path() -> Option<PathBuf> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        return None;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir()?;
+        let jetbrains_cache_dir = home.join("Library").join("Caches").join("JetBrains");
+        let entries = fs::read_dir(jetbrains_cache_dir).ok()?;
+
+        let mut candidates = Vec::<(Vec<u32>, PathBuf)>::new();
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let Some(version) = parse_webstorm_version(&name) else {
+                continue;
+            };
+            candidates.push((version, path));
+        }
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        candidates.sort_by(|(left_version, left_path), (right_version, right_path)| {
+            compare_version_parts(left_version, right_version).then_with(|| left_path.cmp(right_path))
+        });
+        let (_, latest_dir) = candidates.pop()?;
+        Some(latest_dir.join("aia").join("codex").join("auth.json"))
+    }
+}
+
+fn parse_webstorm_version(dir_name: &str) -> Option<Vec<u32>> {
+    let suffix = dir_name.strip_prefix("WebStorm")?;
+    let version_text: String = suffix
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit() || *ch == '.')
+        .collect();
+
+    if version_text.is_empty() {
+        return None;
+    }
+
+    let mut parts = Vec::new();
+    for segment in version_text.split('.') {
+        if segment.is_empty() {
+            continue;
+        }
+        let value = segment.parse::<u32>().ok()?;
+        parts.push(value);
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts)
+    }
+}
+
+fn compare_version_parts(left: &[u32], right: &[u32]) -> Ordering {
+    let max_len = left.len().max(right.len());
+    for index in 0..max_len {
+        let left_value = *left.get(index).unwrap_or(&0);
+        let right_value = *right.get(index).unwrap_or(&0);
+        match left_value.cmp(&right_value) {
+            Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    Ordering::Equal
 }
 
 fn decode_jwt_payload(token: &str) -> Result<Value, String> {
