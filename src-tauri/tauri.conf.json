@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Codex Tools",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "identifier": "com.carry.codex-tools",
   "build": {
     "frontendDist": "../dist",
@@ -41,7 +41,7 @@
     "updater": {
       "active": true,
       "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyMTc5MUU3NzgzM0NCMDQKUldRRXl6TjQ1NUVYVW5qYUhGMjE0cDRiMzBDaUpMdDg0ZmNrOXdBaUZ6bzdZTkZhbHpmTEpsMjUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxREZFNzg5NTQ3MDgyMkIKUldRcmduQlVpZWZmUVJWOFpzd1VaT2I3YmxxUEtHN1U0Y2pxTzBKWERpRjYxNjBHVVBnYlBZTE4K",
       "endpoints": [
         "https://github.com/Easy-Ez/codex-tools/releases/latest/download/latest.json"
       ]

@@ -8,6 +8,9 @@
 仓库地址：<https://github.com/Easy-Ez/codex-tools>
 
 ## 更新日志
+- v0.3.4
+  1. 发布流程调整为仅构建 macOS Apple Silicon（aarch64）。
+  2. 更新 Updater 签名公钥与发布配置，修复新仓库发布签名失败问题。
 - v0.3.3
   1. 切换账号或恢复账号时，除更新 `~/.codex/auth.json` 外，也会同步更新最新 WebStorm 版本的授权文件（`~/Library/Caches/JetBrains/WebStorm*/aia/codex/auth.json`）。
   2. 删除本地活跃授权时，同步删除最新 WebStorm 版本的授权文件，保持两端一致。
@@ -110,13 +113,13 @@ npm run tauri dev
 
 ## 打包与发布（简版）
 
-本项目已配置 GitHub Actions 自动发布（mac 双架构 + Windows）。
+本项目已配置 GitHub Actions 自动发布（仅 macOS Apple Silicon）。
 
 触发发布：
 
 ```bash
-git tag v0.3.3
-git push origin v0.3.3
+git tag v0.3.4
+git push origin v0.3.4
 ```
 
 查看：
